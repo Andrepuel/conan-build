@@ -21,6 +21,10 @@ impl Default for Conan {
 impl Conan {
     pub fn new() -> Conan {
         let build_info_path = Self::find_build_info();
+        println!(
+            "cargo:rerun-if-changed={path}",
+            path = build_info_path.to_string_lossy()
+        );
         let build_info: Value =
             serde_json::from_str(&std::fs::read_to_string(&build_info_path).unwrap())
                 .expect("Invalid build info json");

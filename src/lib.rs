@@ -77,6 +77,12 @@ impl Conan {
         .apply()
     }
 
+    pub fn depends_on_libcxx(&self) {
+        if let Some(cxx) = self.libcxx() {
+            cxx.apply();
+        }
+    }
+
     pub fn get_depends_on<'a, I: IntoIterator<Item = &'a str>>(&self, packages: I) -> DependsOn {
         packages
             .into_iter()

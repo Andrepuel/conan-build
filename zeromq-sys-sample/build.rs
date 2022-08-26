@@ -1,4 +1,4 @@
-use conan_build::{Applyable, Conan};
+use conan_build::Conan;
 use std::process::Command;
 
 fn main() {
@@ -12,8 +12,5 @@ fn main() {
     let conan = Conan::new();
     conan.depends_on(["zeromq"]);
     conan.depends_on_optional(["libsodium"]);
-
-    if let Some(cxx) = conan.libcxx() {
-        cxx.apply();
-    }
+    conan.depends_on_libcxx();
 }

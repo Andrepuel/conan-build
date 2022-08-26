@@ -1,14 +1,11 @@
 [package]
-name = "conan-build"
+name = "zeromq-sys-sample"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde_json = "1.0.79"
 
-[workspace]
-members = [
-    "zeromq-sys-sample",
-]
+[build-dependencies]
+conan-build = { path = "../", version = "0.1.0" }

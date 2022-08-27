@@ -60,7 +60,7 @@ impl Conan {
             })
             .unwrap_or_else(|| {
                 panic!(
-                    "Could not find {BUILD_INFO}. Did you forget to run conan install?",
+                    "Could not find {BUILD_INFO}. Did you forget to run conan install or to set CONANBUILDINFO variable?",
                     BUILD_INFO = BUILD_INFO
                 )
             })

@@ -41,12 +41,16 @@ impl Conan {
     }
 
     pub fn find_build_info() -> PathBuf {
-        std::env::current_dir()
-            .unwrap()
-            .ancestors()
-            .find_map(|path| {
+        std::env::var("CONANBUILDINFO")
+            .ok()
+            .map(Into::into)
+            .into_iter()
+            .chain(std::env::current_dir().unwrap().ancestors().map(|path| {
                 let mut path = path.to_owned();
                 path.push(BUILD_INFO);
+                path
+            }))
+            .find_map(|path| {
                 eprintln!("Trying {path:?}");
 
                 match path.exists() {

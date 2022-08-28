@@ -9,6 +9,7 @@ use std::{
 const BUILD_INFO: &str = "conanbuildinfo.json";
 
 pub struct Conan {
+    build_info_path: PathBuf,
     build_info: HashMap<String, Value>,
     libs: HashMap<String, Link>,
     settings: Value,
@@ -30,7 +31,12 @@ impl Conan {
         let build_info = crate::build_info(&build_info);
         let libs = crate::find_all_libs(build_info.iter());
 
-        Conan { build_info, libs, settings }
+        Conan {
+            build_info_path,
+            build_info,
+            libs,
+            settings,
+        }
     }
 
     pub fn find_build_info() -> PathBuf {
@@ -104,7 +110,7 @@ impl Conan {
         DependsOn { libs, libdirs }
     }
 
-    pub fn all_deps(&self) -> impl Iterator<Item = &str> {
+    pub fn all_deps(&self) -> impl Iterator<Item = &str> + Clone {
         self.build_info.keys().map(|x| x.as_str())
     }
 
@@ -157,17 +163,52 @@ impl Conan {
     }
 
     pub fn generate_env_source(&self) {
-        let openssl_dir = self.rootpath_for("openssl");
-        let lddirs = self.libdir_for("openssl").join(":");
+        let mut sh = File::create("env.sh").unwrap();
+        let mut ps1 = File::create("env.ps1").unwrap();
 
-        let mut env = File::create("env.sh").unwrap();
-        writeln!(env, "export OPENSSL_DIR={openssl_dir}",).unwrap();
-        writeln!(env, "export LD_LIBRARY_PATH={lddirs}").unwrap();
+        writeln!(
+            sh,
+            "export CONANBUILDINFO={}",
+            self.build_info_path.to_string_lossy()
+        )
+        .unwrap();
+        writeln!(
+            ps1,
+            "$env:CONANBUILDINFO=\"{}\"",
+            self.build_info_path.to_string_lossy()
+        )
+        .unwrap();
 
-        let mut env = File::create("env.ps1").unwrap();
-        let lddirs = self.bindir_for("openssl").join(";").replace('\\', "\\\\");
-        writeln!(env, "$env:OPENSSL_DIR=\"{openssl_dir}\"").unwrap();
-        writeln!(env, "$env:PATH=\"{lddirs};$env:PATH\"").unwrap();
+        let shared_deps = self.all_deps().filter(|package| {
+            self.libs_for(package)
+                .into_iter()
+                .any(|lib| self.is_shared(lib))
+        });
+
+        let libdirs = shared_deps
+            .clone()
+            .flat_map(|package| self.libdir_for(package).into_iter())
+            .collect::<Vec<_>>()
+            .join(":");
+
+        if !libdirs.is_empty() {
+            writeln!(sh, "export LD_LIBRARY_PATH={libdirs}").unwrap();
+        }
+        let bindirs = shared_deps
+            .flat_map(|package| self.bindir_for(package))
+            .collect::<Vec<_>>()
+            .join(";")
+            .replace('\\', "\\\\");
+
+        if !bindirs.is_empty() {
+            writeln!(ps1, "$env:PATH=\"{bindirs};$env:PATH\"").unwrap();
+        }
+
+        if self.try_package("openssl").is_some() {
+            let openssl_dir = self.rootpath_for("openssl");
+            writeln!(sh, "export OPENSSL_DIR={openssl_dir}",).unwrap();
+            writeln!(ps1, "$env:OPENSSL_DIR=\"{openssl_dir}\"").unwrap();
+        }
     }
 
     pub fn is_shared(&self, lib: &str) -> bool {

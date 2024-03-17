@@ -21,10 +21,7 @@ impl Default for Conan {
 impl Conan {
     pub fn new() -> Conan {
         let build_info_path = Self::find_build_info();
-        println!(
-            "cargo:rerun-if-changed={path}",
-            path = build_info_path.to_string_lossy()
-        );
+        println!("cargo:rerun-if-changed={path}", path = build_info_path.to_string_lossy());
         let build_info: Value =
             serde_json::from_str(&std::fs::read_to_string(&build_info_path).unwrap())
                 .expect("Invalid build info json");
@@ -33,11 +30,7 @@ impl Conan {
         let build_info = crate::build_info(&build_info);
         let libs = crate::find_all_libs(build_info.iter());
 
-        Conan {
-            build_info,
-            libs,
-            settings,
-        }
+        Conan { build_info, libs, settings }
     }
 
     pub fn find_build_info() -> PathBuf {
@@ -68,9 +61,7 @@ impl Conan {
 
     pub fn depends_on<'a, I: IntoIterator<Item = &'a str>>(&self, packages: I) {
         DependsOn::extend_all(
-            packages
-                .into_iter()
-                .map(|package| self.get_depends_on_package(package)),
+            packages.into_iter().map(|package| self.get_depends_on_package(package)),
         )
         .apply()
     }
@@ -92,29 +83,23 @@ impl Conan {
     }
 
     pub fn get_depends_on<'a, I: IntoIterator<Item = &'a str>>(&self, packages: I) -> DependsOn {
-        packages
-            .into_iter()
-            .map(|package| self.get_depends_on_package(package))
-            .fold(DependsOn::default(), |mut a, b| {
+        packages.into_iter().map(|package| self.get_depends_on_package(package)).fold(
+            DependsOn::default(),
+            |mut a, b| {
                 a.extend(b);
                 a
-            })
+            },
+        )
     }
 
     pub fn get_depends_on_package(&self, package: &str) -> DependsOn {
         let libs = self
             .libs_for(package)
             .into_iter()
-            .map(|name| Lib {
-                is_static: !self.is_shared(name),
-                name: name.to_string(),
-            })
+            .map(|name| Lib { is_static: !self.is_shared(name), name: name.to_string() })
             .collect();
-        let libdirs = self
-            .libdir_for(package)
-            .into_iter()
-            .map(|dir| LibDir(dir.to_string()))
-            .collect();
+        let libdirs =
+            self.libdir_for(package).into_iter().map(|dir| LibDir(dir.to_string())).collect();
 
         DependsOn { libs, libdirs }
     }
@@ -132,6 +117,15 @@ impl Conan {
             .collect()
     }
 
+    pub fn includes_for(&self, package: &str) -> Vec<&str> {
+        self.package(package)["include_paths"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|json| json.as_str().unwrap())
+            .collect()
+    }
+
     pub fn libdir_for(&self, package: &str) -> Vec<&str> {
         Self::libdir_for_package(self.package(package)).collect()
     }
@@ -146,11 +140,7 @@ impl Conan {
     }
 
     pub fn libdir_for_package(value: &Value) -> impl Iterator<Item = &str> {
-        value["lib_paths"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|lib| lib.as_str().unwrap())
+        value["lib_paths"].as_array().unwrap().iter().map(|lib| lib.as_str().unwrap())
     }
 
     pub fn bindir_for(&self, package: &str) -> Vec<&str> {
@@ -193,10 +183,7 @@ impl Conan {
     }
 
     pub fn libcxx(&self) -> Option<Lib> {
-        self.libcxx_name().map(|name| Lib {
-            is_static: false,
-            name: name.to_string(),
-        })
+        self.libcxx_name().map(|name| Lib { is_static: false, name: name.to_string() })
     }
 
     fn libcxx_name(&self) -> Option<&str> {
@@ -237,50 +224,46 @@ fn build_info(root: &Value) -> HashMap<String, Value> {
 fn find_all_libs<'a, I: Iterator<Item = (&'a String, &'a Value)>>(it: I) -> HashMap<String, Link> {
     it.flat_map(|(_, v)| {
         Conan::libdir_for_package(v).flat_map(|path| {
-            Path::new(path)
-                .read_dir()
-                .unwrap()
-                .map(|x| x.unwrap())
-                .filter_map(|entry| {
-                    let lib = entry.file_name().to_string_lossy().into_owned();
-                    if lib.ends_with(".lib") {
-                        let lib = &lib[..lib.len() - 4];
+            Path::new(path).read_dir().unwrap().map(|x| x.unwrap()).filter_map(|entry| {
+                let lib = entry.file_name().to_string_lossy().into_owned();
+                if lib.ends_with(".lib") {
+                    let lib = &lib[..lib.len() - 4];
 
-                        let mut dll = entry.path();
-                        dll.pop();
-                        dll.pop();
-                        dll.push("bin");
-                        dll.push(format!("{lib}.dll"));
+                    let mut dll = entry.path();
+                    dll.pop();
+                    dll.pop();
+                    dll.push("bin");
+                    dll.push(format!("{lib}.dll"));
 
-                        let link = match dll.exists() {
-                            true => Link::Shared,
-                            false => Link::Static,
-                        };
-
-                        return Some((lib.to_string(), link));
-                    }
-
-                    let link;
-                    if lib.ends_with(".so") {
-                        link = Link::Shared;
-                    } else if lib.ends_with(".a") {
-                        link = Link::Static;
-                    } else {
-                        return None;
-                    }
-
-                    let lib = match lib.starts_with("lib") {
-                        true => &lib[3..],
-                        false => &lib,
-                    };
-                    let ext = lib.rfind('.');
-                    let lib = match ext {
-                        Some(ext) => &lib[..ext],
-                        None => lib,
+                    let link = match dll.exists() {
+                        true => Link::Shared,
+                        false => Link::Static,
                     };
 
-                    Some((lib.to_string(), link))
-                })
+                    return Some((lib.to_string(), link));
+                }
+
+                let link;
+                if lib.ends_with(".so") {
+                    link = Link::Shared;
+                } else if lib.ends_with(".a") {
+                    link = Link::Static;
+                } else {
+                    return None;
+                }
+
+                let lib = match lib.starts_with("lib") {
+                    true => &lib[3..],
+                    false => &lib,
+                };
+                let ext = lib.rfind('.');
+                let lib = match ext {
+                    Some(ext) => &lib[..ext],
+                    None => lib,
+                };
+
+                Some((lib.to_string(), link))
+            })
         })
     })
     .collect()

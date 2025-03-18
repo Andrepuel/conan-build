@@ -1,2 +1,4 @@
 /Cargo.lock
 /target
+/env.ps1
+/env.sh

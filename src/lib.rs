@@ -297,7 +297,7 @@ impl BuildInfo {
             },
             "Android" => match arch {
                 "armv8" => "aarch64-linux-android",
-                "armv7 " => "armv7-linux-androideabi",
+                "armv7" => "armv7-linux-androideabi",
                 "x86" => "i686-linux-android",
                 "x86_64" => "x86_64-linux-android",
                 arch => unimplemented!("Unsupported architecture {arch:?}/{os:?}"),

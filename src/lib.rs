@@ -30,8 +30,8 @@ impl BuildInfoSet {
     }
 
     pub fn path_from_env() -> impl Iterator<Item = PathBuf> {
-        std::env::vars().filter_map(|(key, path)| match key.split_once('_') {
-            Some((_target, "CONANBUILDINFO")) => Some(path.into()),
+        std::env::vars().filter_map(|(key, path)| match key.split('_').next_back() {
+            Some("CONANBUILDINFO") => Some(path.into()),
             None if key == "CONANBUILDINFO" => Some(path.into()),
             _ => None,
         })
